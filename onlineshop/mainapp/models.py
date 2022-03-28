@@ -1,9 +1,11 @@
-from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from PIL import Image
+from io import BytesIO
+import sys
 
 User = get_user_model()
 
@@ -65,13 +67,22 @@ class Product(models.Model):
 
     def save(self, *args, **kwargs):
         img = Image.open(self.image)
-        min_height, min_width = self.MIN_RESOLUTION
-        max_height, max_width = self.MAX_RESOLUTION
-        if img.height < min_height or img.width < min_width:
-            raise MinResolutionErrorExcepction('Разрешение изображения меньше минимального')
-        elif img.height > max_height or img.width > max_width:
-            raise MaxResolutionErrorExcepction(f'Разрешение изображения больше допустимого размера {self.MAX_RESOLUTION}')
-        return self.image
+        new_img = img.convert('RGB')
+        resized_new_img = new_img.resize((200, 200), Image.ANTIALIAS)
+        filestream = BytesIO()
+        resized_new_img.save(filestream, 'JPEG', quality=90)
+        filestream.seek(0)
+        name = '{}.{}'.format(*self.image.name.split('.'))
+        self.image = InMemoryUploadedFile(
+            filestream, 'ImageField', name, 'jpeg/image', sys.getsizeof(filestream), None
+        )
+        super().save(*args, **kwargs)
+        # min_height, min_width = self.MIN_RESOLUTION
+        # max_height, max_width = self.MAX_RESOLUTION
+        # if img.height < min_height or img.width < min_width:
+        #     raise MinResolutionErrorExcepction('Разрешение изображения меньше минимального')
+        # elif img.height > max_height or img.width > max_width:
+        #     raise MaxResolutionErrorExcepction(f'Разрешение изображения больше допустимого размера {self.MAX_RESOLUTION}')
 
 
 class CartProduct(models.Model):
