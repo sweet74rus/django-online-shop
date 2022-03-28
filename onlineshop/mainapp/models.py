@@ -1,10 +1,17 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
+from PIL import Image
 
 User = get_user_model()
 
+class MinResolutionErrorExcepction(Exception):
+    pass
+
+class MaxResolutionErrorExcepction(Exception):
+    pass
 
 class LatestProductsManager:
 
@@ -39,6 +46,10 @@ class Category(models.Model):
 
 
 class Product(models.Model):
+    MIN_RESOLUTION = (400, 400)
+    MAX_RESOLUTION = (800, 800)
+    MAX_IMAGE_SIZE = 3145728
+
     class Meta:
         abstract = True
 
@@ -51,6 +62,16 @@ class Product(models.Model):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        img = Image.open(self.image)
+        min_height, min_width = self.MIN_RESOLUTION
+        max_height, max_width = self.MAX_RESOLUTION
+        if img.height < min_height or img.width < min_width:
+            raise MinResolutionErrorExcepction('Разрешение изображения меньше минимального')
+        elif img.height > max_height or img.width > max_width:
+            raise MaxResolutionErrorExcepction(f'Разрешение изображения больше допустимого размера {self.MAX_RESOLUTION}')
+        return self.image
 
 
 class CartProduct(models.Model):
